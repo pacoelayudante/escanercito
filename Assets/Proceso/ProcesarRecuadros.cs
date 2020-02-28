@@ -43,14 +43,58 @@ public class ProcesarRecuadros : MonoBehaviour
     public List<Recuadro> Recuadros => recuadros;
     Texture ultimaTexturaProcesada;
     Mat matOriginal, matProcesado, matEscalado;
+    List<ProtoRecuadro> protoRecuadros = new List<ProtoRecuadro>();
+    [Header("Proto recuadros")]
+    public int cantCuadrosCargaProtoRecuadro = 30;
+    public float factorDescargaProtoRecuadro = 0.25f;
+    public float diametroCargadorProtoRecuadro = 20f;
+    public float maxDiferenciaProtoRecuadros = .1f;
+    bool autoDetectados = false;
+    public bool AutoDetectados => autoDetectados;
 
-    public float ConstanteAdaptiva {
+    class ProtoRecuadro
+    {
+        public float carga = 0f;
+        public OpenCvSharp.Rect boundingBox;
+        public Point[] quad;
+
+        float area;
+        public ProtoRecuadro(Point[] contorno)
+        {
+            this.quad = contorno;
+            this.boundingBox = Cv2.BoundingRect(contorno);
+            area = this.boundingBox.Width * this.boundingBox.Height;
+        }
+
+        public bool Comparar(Contorno contorno, float umbralDiferenciaArea = 0.9f)
+        {
+            return Comparar(contorno.contorno, umbralDiferenciaArea);
+        }
+        public bool Comparar(Point[] contorno, float umbralDiferenciaArea = 0.9f)
+        {
+            var entreBoundingRect = Cv2.BoundingRect(contorno);
+            var areaEntra = entreBoundingRect.Width * entreBoundingRect.Height;
+            var areaMin = Mathf.Min(areaEntra, area);
+            var interseccion = entreBoundingRect.Intersect(boundingBox);
+            if (Mathf.Abs(areaMin - interseccion.Width * interseccion.Height) < areaMin * umbralDiferenciaArea)
+            {
+                boundingBox = entreBoundingRect;
+                area = areaEntra;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    public float ConstanteAdaptiva
+    {
         get => (float)filtroAdaptativo.C;
         set => filtroAdaptativo.C = value;
     }
-    public float TamBloqueAdaptivo {
-        get => (float)(filtroAdaptativo.blockSize-1)/2;
-        set => filtroAdaptativo.blockSize = ((int)value)*2+1;
+    public float TamBloqueAdaptivo
+    {
+        get => (float)(filtroAdaptativo.blockSize - 1) / 2;
+        set => filtroAdaptativo.blockSize = ((int)value) * 2 + 1;
     }
 
     public Mat MatOriginal
@@ -107,6 +151,12 @@ public class ProcesarRecuadros : MonoBehaviour
         escalaXY.Y = matProcesado.Height / escalaXY.Y;
         filtroAdaptativo.Procesar(matProcesado);
 
+        // if(protoRecuadros.Count>0) {
+        //     recuadros = protoRecuadros.Select(pr => new Recuadro(pr.quad, escalaXY)).ToList();
+        //     protoRecuadros.Clear();
+        //     return matProcesado;
+        // }
+
         mapaDeContornos = filtroContornos.ProcesarYGenerarArbol(matProcesado);
         contornosRecuadrables = FiltrarContornos(mapaDeContornos.contornosExteriores, (cont) =>
              cont.hijos.Count > 0 && cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
@@ -115,9 +165,15 @@ public class ProcesarRecuadros : MonoBehaviour
         recuadros = contornosRecuadrables.Where(cont =>
             cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
              cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro)
-            .Select(cont => new Recuadro(cont.indiceOriginal, cont.contorno, toleranciaLineaRecta, escalaXY)).ToList();
+            .Select(cont => new Recuadro(SimplificarContorno(cont), escalaXY)).ToList();
+            // .Select(cont => new Recuadro(cont, Simplificar(cont), escalaXY)).ToList();
 
         return matProcesado;
+    }
+    public Point[] SimplificarContorno(Contorno contorno)
+    {
+        var epsilonTalVez = Mathd.Min(contorno.BoundingRect.Width, contorno.BoundingRect.Height) / 10d;
+        return Cv2.ApproxPolyDP(contorno.contorno, epsilonTalVez, true);
     }
 
     public Texture2D PreProcesarTextura(Texture2D texturaEntrada, Texture2D salida)
@@ -141,20 +197,36 @@ public class ProcesarRecuadros : MonoBehaviour
              cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro).SelectMany(c => c.hijos).Where(cont =>
             cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
              cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro);//.Select(c=>c.contorno).ToList();
-        Cv2.CvtColor(matEntrada,matEntrada,ColorConversionCodes.GRAY2BGR);
+        Cv2.CvtColor(matEntrada, matEntrada, ColorConversionCodes.GRAY2BGR);
         // Cv2.DrawContours(matEntrada,matContornos,-1,ColEscalarRojo,-1);
-        Cv2.DrawContours(matEntrada,contornos.Select(c=>c.contorno),-1,ColEscalarRojo,1);
+        Cv2.DrawContours(matEntrada, contornos.Select(c => c.contorno), -1, ColEscalarRojo, 1);
 
-        var contornosReducidos = contornos.Select(contorno=> {
-             var epsilonTalVez = Mathd.Min( contorno.BoundingRect.Width,contorno.BoundingRect.Height)/10d;
-            return Cv2.ApproxPolyDP(contorno.contorno,epsilonTalVez,true);
-        });
-        Cv2.DrawContours(matEntrada,contornosReducidos,-1,ColEscalarAzul,1);
-        contornosReducidos = contornos.Select(contorno=> {
-             var epsilonTalVez = Mathd.Min( contorno.BoundingRect.Width,contorno.BoundingRect.Height)/10d;
-            return Cv2.ApproxPolyDP(contorno.contorno,epsilonTalVez,true);
-        }).Where(cont=>cont.Length==4);
-        Cv2.DrawContours(matEntrada,contornosReducidos,-1,ColEscalarVerde,1);
+        var contornosReducidos = contornos.Select(SimplificarContorno);
+        Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarAzul, 1);
+        contornosReducidos = contornosReducidos.Where(cont => cont.Length == 4);
+        Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarVerde, 1);
+
+        autoDetectados = false;
+        foreach (var contorno in contornosReducidos)
+        {
+            var coincidencia = protoRecuadros.FirstOrDefault(proto => proto.Comparar(contorno,maxDiferenciaProtoRecuadros));
+            if (coincidencia == null)
+            {
+                coincidencia = new ProtoRecuadro(contorno);
+                protoRecuadros.Add(coincidencia);
+            }
+            if(coincidencia.carga<1.5f)coincidencia.carga += (1f+factorDescargaProtoRecuadro)/cantCuadrosCargaProtoRecuadro;
+        }
+        foreach(var protoRecuadro in protoRecuadros) {
+            Cv2.Rectangle(matEntrada,protoRecuadro.boundingBox.TopLeft,protoRecuadro.boundingBox.BottomRight, ColEscalarVerde, 2);
+            Cv2.Ellipse(matEntrada,protoRecuadro.boundingBox.Center,new Size(diametroCargadorProtoRecuadro,diametroCargadorProtoRecuadro),0,0,360f*protoRecuadro.carga,ColEscalarVerde,-1);
+            protoRecuadro.carga -= factorDescargaProtoRecuadro/cantCuadrosCargaProtoRecuadro;
+        }
+        for (int i=protoRecuadros.Count-1; i>=0; i--) {
+            if(protoRecuadros[i].carga <= 0f) protoRecuadros.RemoveAt(i);
+        }
+        if (protoRecuadros.Count==0) autoDetectados = false;
+        else autoDetectados = protoRecuadros.All(protoRecuadro=>protoRecuadro.carga>=1f-factorDescargaProtoRecuadro/cantCuadrosCargaProtoRecuadro);
 
         if (text2d == null || !text2d.isReadable)
         {
@@ -239,7 +311,7 @@ public class ProcesarRecuadros : MonoBehaviour
                 Cv2.DrawContours(matdraw, coso.contornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
                 foreach (var rec in coso.recuadros)
                 {
-                    rec.DibujarDebug(matdraw, ColEscalarRojo, escala);
+                    // rec.DibujarDebug(matdraw, ColEscalarRojo, escala);
                     // var rect = Cv2.MinAreaRect(rec.contornoOriginal);
                     // Cv2.Polylines(matdraw, new[] { rect.Points().Select(e => new Point(e.X, e.Y)) }, true, ColEscalarRojo, 3);
                 }
@@ -252,15 +324,15 @@ public class ProcesarRecuadros : MonoBehaviour
             }
             EditorGUI.EndDisabledGroup();
             DrawDefaultInspector();
-            EditorGUI.BeginDisabledGroup(coso.Recuadros == null);
-            if (verRecs = EditorGUILayout.Foldout(verRecs && coso.Recuadros != null, "Ver Recuadros"))
-            {
-                foreach (var rec in coso.Recuadros)
-                {
-                    GUILayout.Label($"{rec.indiceContorno} - {rec.escalaContornos.X}x{rec.escalaContornos.Y}\n{rec.anchoSupuesto}x{rec.altoSupuesto}");
-                }
-            }
-            EditorGUI.EndDisabledGroup();
+            // EditorGUI.BeginDisabledGroup(coso.Recuadros == null);
+            // if (verRecs = EditorGUILayout.Foldout(verRecs && coso.Recuadros != null, "Ver Recuadros"))
+            // {
+            // foreach (var rec in coso.Recuadros)
+            // {
+            // GUILayout.Label($"{rec.indiceContorno} - {rec.escalaContornos.X}x{rec.escalaContornos.Y}\n{rec.anchoSupuesto}x{rec.altoSupuesto}");
+            // }
+            // }
+            // EditorGUI.EndDisabledGroup();
         }
     }
 #endif

@@ -89,6 +89,7 @@ public class CamControl : MonoBehaviour
         while (preprocesarEnVivo && camara.isPlaying) {
             if (camara.didUpdateThisFrame) {
                 mostrarCamaraAca.texture = (textProc = procesarRecuadros.PreProcesarTextura(camara,textProc));
+                if (procesarRecuadros.AutoDetectados) AlTocarBoton();
             }
             yield return null;
         }
@@ -102,19 +103,21 @@ public class CamControl : MonoBehaviour
         }
         else
         {
-            var coso = procesarRecuadros;
-            var matDebug = coso.ProcesarTextura(camara);
-            // void matdraw = matDebug;
+            // var coso = procesarRecuadros;
+            var matDebug = procesarRecuadros.ProcesarTextura(camara);
+            // var matdraw = matDebug;
             var matdraw = OpenCvSharp.Unity.TextureToMat(camara);
             if (sprites) sprites.Extraer();
 
             camara.Stop();
 
             var escala = matdraw.Width / (double)matDebug.Width;
-            if (matdraw.Channels() == 1) OpenCvSharp.Cv2.CvtColor(matdraw, matdraw, OpenCvSharp.ColorConversionCodes.GRAY2BGR);
-            OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.padre.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarVerde);
-            OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
-            foreach (var rec in coso.Recuadros) rec.DibujarDebug(matdraw, ProcesarRecuadros.ColEscalarRojo, escala);
+            // if (matdraw.Channels() == 1) OpenCvSharp.Cv2.CvtColor(matdraw, matdraw, OpenCvSharp.ColorConversionCodes.GRAY2BGR);
+            // OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.padre.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarVerde);
+            // OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
+            // foreach (var rec in coso.Recuadros) rec.DibujarDebug(matdraw, ProcesarRecuadros.ColEscalarRojo, escala);
+            OpenCvSharp.Cv2.DrawContours(matdraw, procesarRecuadros.Recuadros.Select(rec=>rec.quadReducido.Select(p=>p*escala)),
+            -1, ProcesarRecuadros.ColEscalarAzul,3);
 
             if (mostrarCamaraAca)
             {
