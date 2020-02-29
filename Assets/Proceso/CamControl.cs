@@ -10,9 +10,13 @@ public class CamControl : MonoBehaviour
     public Button boton;
     public Text textUI;
 
+    public GameObject contenedorSprites;
+    public RectTransform padreSprites;
+
     public bool preprocesarEnVivo = true;
     public ProcesarRecuadros procesarRecuadros;
     public ExtraerSprites sprites;
+    public Button verCamVerSprites;
 
     AspectRatioFitter aspectFitter;
     WebCamTexture camara;
@@ -25,6 +29,14 @@ public class CamControl : MonoBehaviour
         if (!textUI) textUI = GetComponentInChildren<Text>();
         StartCoroutine(IniciarCamara());
         if (boton) boton.onClick.AddListener(AlTocarBoton);
+
+        if (verCamVerSprites) {
+            verCamVerSprites.onClick.AddListener( ()=>{
+                mostrarCamaraAca.enabled = !mostrarCamaraAca.enabled;
+                contenedorSprites.gameObject.SetActive(!mostrarCamaraAca.enabled);
+            });
+        }
+
     }
     IEnumerator IniciarCamara()
     {
@@ -57,6 +69,8 @@ public class CamControl : MonoBehaviour
             camara = new WebCamTexture(mejorDevice.name, mejorResolucion.width, mejorResolucion.height, mejorResolucion.refreshRate);
             if (camara)
             {
+                if(contenedorSprites) contenedorSprites.gameObject.SetActive(false);
+                if(verCamVerSprites) verCamVerSprites.gameObject.SetActive(false);
                 camara.Play();
                 
                     mostrarCamaraAca.texture = camara;
@@ -117,7 +131,23 @@ public class CamControl : MonoBehaviour
                 OpenCvSharp.Unity.MatToTexture(matdraw, textura);
 
                 mostrarCamaraAca.texture = textura;
-                StartCoroutine(SlideShow(textura));
+                if(contenedorSprites && padreSprites)MostrarSprites();
+                else StartCoroutine(SlideShow(textura));
+            }
+        }
+    }
+
+    void MostrarSprites() {
+        if (contenedorSprites && padreSprites) {
+            if(verCamVerSprites) verCamVerSprites.gameObject.SetActive(true);
+            mostrarCamaraAca.enabled = false;
+            contenedorSprites.gameObject.SetActive(true);
+            var imgs = padreSprites.GetComponentsInChildren< RawImage>();
+            foreach(var img in imgs) img.gameObject.SetActive(false);
+            for (int i=0; i<sprites.texturasResultantes.Count; i++) {
+                RawImage img = i<imgs.Length?imgs[i]:Instantiate(imgs[0],padreSprites);
+                img.gameObject.SetActive(true);
+                img.texture = sprites.texturasResultantes[i];
             }
         }
     }
