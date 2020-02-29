@@ -58,24 +58,15 @@ public class CamControl : MonoBehaviour
             if (camara)
             {
                 camara.Play();
-                mostrarCamaraAca.texture = camara;
-                if (mostrarCamaraAca.rectTransform.anchorMax.x != .5f)
-                {
-                    var rectTam = mostrarCamaraAca.rectTransform.rect.size;
-                    mostrarCamaraAca.rectTransform.anchorMax = mostrarCamaraAca.rectTransform.anchorMin = Vector2.one * 0.5f;
-                    mostrarCamaraAca.rectTransform.sizeDelta = new Vector2(camara.width, camara.height);
-
-                    var escala = Mathf.Min(rectTam.x / camara.width, rectTam.y / camara.height);
-                    if (camara.videoRotationAngle == 90)
-                    {
-                        mostrarCamaraAca.rectTransform.Rotate(0, 0, -camara.videoRotationAngle);
-                        escala = Mathf.Min(rectTam.y / camara.width, rectTam.x / camara.height);
+                
+                    mostrarCamaraAca.texture = camara;
+                    var mostrarConExtras = mostrarCamaraAca as ImageConExtras;
+                    if (mostrarConExtras) {
+                        mostrarConExtras.rotado = camara.videoRotationAngle != 0;
                     }
-                    mostrarCamaraAca.rectTransform.localScale = Vector3.one * escala;
-                }
 
                 if (textUI) textUI.text += $"\nDevice {camara.deviceName} - {camara.width}x{camara.height}-{camara.videoRotationAngle}°";
-                if(preprocesarEnVivo) StartCoroutine(PreprocesarEnVivo());
+                if (preprocesarEnVivo) StartCoroutine(PreprocesarEnVivo());
             }
         }
         else
@@ -84,11 +75,14 @@ public class CamControl : MonoBehaviour
         }
     }
 
-    IEnumerator PreprocesarEnVivo() {
+    IEnumerator PreprocesarEnVivo()
+    {
         Texture2D textProc = null;
-        while (preprocesarEnVivo && camara.isPlaying) {
-            if (camara.didUpdateThisFrame) {
-                mostrarCamaraAca.texture = (textProc = procesarRecuadros.PreProcesarTextura(camara,textProc));
+        while (preprocesarEnVivo && camara.isPlaying)
+        {
+            if (camara.didUpdateThisFrame)
+            {
+                mostrarCamaraAca.texture = (textProc = procesarRecuadros.PreProcesarTextura(camara, textProc));
                 if (procesarRecuadros.AutoDetectados) AlTocarBoton();
             }
             yield return null;
@@ -112,12 +106,9 @@ public class CamControl : MonoBehaviour
             camara.Stop();
 
             var escala = matdraw.Width / (double)matDebug.Width;
-            // if (matdraw.Channels() == 1) OpenCvSharp.Cv2.CvtColor(matdraw, matdraw, OpenCvSharp.ColorConversionCodes.GRAY2BGR);
-            // OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.padre.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarVerde);
-            // OpenCvSharp.Cv2.DrawContours(matdraw, coso.ContornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
-            // foreach (var rec in coso.Recuadros) rec.DibujarDebug(matdraw, ProcesarRecuadros.ColEscalarRojo, escala);
-            OpenCvSharp.Cv2.DrawContours(matdraw, procesarRecuadros.Recuadros.Select(rec=>rec.quadReducido.Select(p=>p*escala)),
-            -1, ProcesarRecuadros.ColEscalarAzul,3);
+            
+            OpenCvSharp.Cv2.DrawContours(matdraw, procesarRecuadros.Recuadros.Select(rec => rec.quadReducido.Select(p => p * escala)),
+            -1, ProcesarRecuadros.ColEscalarAzul, 3);
 
             if (mostrarCamaraAca)
             {
@@ -134,7 +125,9 @@ public class CamControl : MonoBehaviour
     IEnumerator SlideShow(Texture2D textResultA)
     {
         int indice = -1;
-        float aspectActual = aspectFitter?aspectFitter.aspectRatio:1f;
+        float aspectActual = aspectFitter ? aspectFitter.aspectRatio : 1f;
+        var mostrarConExtras = mostrarCamaraAca as ImageConExtras;
+        var rotado = mostrarConExtras && mostrarConExtras.rotado;
         while (!camara.isPlaying)
         {
             indice++;
@@ -142,13 +135,15 @@ public class CamControl : MonoBehaviour
             else if (indice == sprites.texturasResultantes.Count) indice = -1;
             if (indice == -1)
             {
-                if(aspectFitter)aspectFitter.aspectRatio = aspectActual;
+                if (aspectFitter) aspectFitter.aspectRatio = aspectActual;
+                if (mostrarConExtras) mostrarConExtras.rotado = rotado;
                 mostrarCamaraAca.texture = textResultA;
             }
             else
             {
                 mostrarCamaraAca.texture = sprites.texturasResultantes[indice];
-                if(aspectFitter)aspectFitter.aspectRatio = mostrarCamaraAca.texture.width / (float)mostrarCamaraAca.texture.height;
+                if (mostrarConExtras) mostrarConExtras.rotado = false;
+                if (aspectFitter) aspectFitter.aspectRatio = mostrarCamaraAca.texture.width / (float)mostrarCamaraAca.texture.height;
             }
             yield return new WaitForSeconds(1f);
         }

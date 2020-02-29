@@ -37,8 +37,8 @@ public class ProcesarRecuadros : MonoBehaviour
     public float toleranciaLineaRecta = 15f;
 
     ArbolDeContornos mapaDeContornos;
-    List<Contorno> contornosRecuadrables;
-    public List<Contorno> ContornosRecuadrables => contornosRecuadrables;
+    // List<Contorno> contornosRecuadrables;
+    // public List<Contorno> ContornosRecuadrables => contornosRecuadrables;
     List<Recuadro> recuadros;
     public List<Recuadro> Recuadros => recuadros;
     Texture ultimaTexturaProcesada;
@@ -156,16 +156,19 @@ public class ProcesarRecuadros : MonoBehaviour
         //     protoRecuadros.Clear();
         //     return matProcesado;
         // }
+        protoRecuadros.Clear();
 
         mapaDeContornos = filtroContornos.ProcesarYGenerarArbol(matProcesado);
-        contornosRecuadrables = FiltrarContornos(mapaDeContornos.contornosExteriores, (cont) =>
-             cont.hijos.Count > 0 && cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
-             cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro).SelectMany(c => c.hijos).ToList();
+        // contornosRecuadrables = FiltrarContornos(mapaDeContornos.contornosExteriores, (cont) =>
+        //      cont.hijos.Count > 0 && cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
+        //      cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro).SelectMany(c => c.hijos).ToList();
 
-        recuadros = contornosRecuadrables.Where(cont =>
-            cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
-             cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro)
-            .Select(cont => new Recuadro(SimplificarContorno(cont), escalaXY)).ToList();
+        recuadros = FiltrarContornos(mapaDeContornos.contornosExteriores, (cont) =>
+             cont.hijos.Count > 0 && cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
+             cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro).SelectMany(c => c.hijos).
+             Where(cont => cont.RotatedRect.Size.Width >= tamMinimoContornoRecuadro &&
+             cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro).Select(SimplificarContorno).Where(cont => cont.Length == 4)
+             .Select(quad => new Recuadro(quad, escalaXY)).ToList();
             // .Select(cont => new Recuadro(cont, Simplificar(cont), escalaXY)).ToList();
 
         return matProcesado;
@@ -199,12 +202,12 @@ public class ProcesarRecuadros : MonoBehaviour
              cont.RotatedRect.Size.Height >= tamMinimoContornoRecuadro);//.Select(c=>c.contorno).ToList();
         Cv2.CvtColor(matEntrada, matEntrada, ColorConversionCodes.GRAY2BGR);
         // Cv2.DrawContours(matEntrada,matContornos,-1,ColEscalarRojo,-1);
-        Cv2.DrawContours(matEntrada, contornos.Select(c => c.contorno), -1, ColEscalarRojo, 1);
+        // Cv2.DrawContours(matEntrada, contornos.Select(c => c.contorno), -1, ColEscalarRojo, 1);
 
         var contornosReducidos = contornos.Select(SimplificarContorno);
-        Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarAzul, 1);
+        // Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarAzul, 1);
         contornosReducidos = contornosReducidos.Where(cont => cont.Length == 4);
-        Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarVerde, 1);
+        Cv2.DrawContours(matEntrada, contornosReducidos, -1, ColEscalarVerde, 3);
 
         autoDetectados = false;
         foreach (var contorno in contornosReducidos)
@@ -218,7 +221,7 @@ public class ProcesarRecuadros : MonoBehaviour
             if(coincidencia.carga<1.5f)coincidencia.carga += (1f+factorDescargaProtoRecuadro)/cantCuadrosCargaProtoRecuadro;
         }
         foreach(var protoRecuadro in protoRecuadros) {
-            Cv2.Rectangle(matEntrada,protoRecuadro.boundingBox.TopLeft,protoRecuadro.boundingBox.BottomRight, ColEscalarVerde, 2);
+            // Cv2.Rectangle(matEntrada,protoRecuadro.boundingBox.TopLeft,protoRecuadro.boundingBox.BottomRight, ColEscalarVerde, 2);
             Cv2.Ellipse(matEntrada,protoRecuadro.boundingBox.Center,new Size(diametroCargadorProtoRecuadro,diametroCargadorProtoRecuadro),0,0,360f*protoRecuadro.carga,ColEscalarVerde,-1);
             protoRecuadro.carga -= factorDescargaProtoRecuadro/cantCuadrosCargaProtoRecuadro;
         }
@@ -307,8 +310,8 @@ public class ProcesarRecuadros : MonoBehaviour
                 // var matdraw = OCVUnity.TextureToMat(coso.texturaPrueba);
                 var escala = matdraw.Width / (double)matDebug.Width;
                 if (matdraw.Channels() == 1) Cv2.CvtColor(matdraw, matdraw, ColorConversionCodes.GRAY2BGR);
-                Cv2.DrawContours(matdraw, coso.contornosRecuadrables.Select(c => c.padre.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarVerde);
-                Cv2.DrawContours(matdraw, coso.contornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
+                // Cv2.DrawContours(matdraw, coso.contornosRecuadrables.Select(c => c.padre.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarVerde);
+                // Cv2.DrawContours(matdraw, coso.contornosRecuadrables.Select(c => c.contorno.Select(p => p * escala)), -1, ProcesarRecuadros.ColEscalarAzul);
                 foreach (var rec in coso.recuadros)
                 {
                     // rec.DibujarDebug(matdraw, ColEscalarRojo, escala);
